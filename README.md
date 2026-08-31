@@ -65,6 +65,8 @@ python ghemex.py <username> [options]
 | `-w`, `--workers` | Number of threads (default: 10) |
 | `--full` | Scan all branches and tags |
 | `--deep` | Deep scraping via raw `.patch` headers |
+| `-r`, `--repo` | Limit the scan to a single repository (skips listing/scanning the rest of the user's repos) |
+| `--skip-forks` | Skip forks when scanning all repos — forks share commit history with the original, so scanning them rarely turns up new emails and just burns API quota |
 
 > A token is not required for targets with few repositories when running without `--full` or `--deep`. For larger targets or intensive scans, a token is strongly recommended to avoid hitting the unauthenticated API rate limit (60 req/hour).
 
@@ -88,6 +90,18 @@ Full deep scan:
 
 ```bash
 python ghemex.py targetuser -t ghp_yourtoken --full --deep -w 15
+```
+
+Scan only one repository (cheapest option on API quota):
+
+```bash
+python ghemex.py targetuser -r some-repo -t ghp_yourtoken
+```
+
+Full scan skipping forks (avoids re-scanning commits already covered by the original repo):
+
+```bash
+python ghemex.py targetuser -t ghp_yourtoken --skip-forks --full
 ```
 
 ---
