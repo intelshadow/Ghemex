@@ -62,16 +62,21 @@ class GitHubAPIClient:
 
 class GHEmailFinder:
     "repository mapping, commit parsing, and data deduplication"
-    def __init__(self, username, token=None, workers=10, full_scan=False, deep_scan=False):
+    def __init__(self, username, token=None, workers=10, full_scan=False, deep_scan=False, repo=None, skip_forks=False):
         self.username = username
         self.workers = workers
         self.full_scan = full_scan
         self.deep_scan = deep_scan
+        self.repo = repo
+        self.skip_forks = skip_forks
         self.api = GitHubAPIClient(token)
         self.results = []
 
     def get_repos(self):
         "Retrieves all public repositories for the user via pagination."
+        if self.repo:
+            return [{"name": self.repo}]
+
         repos = []
         page = 1
         while True:
@@ -81,12 +86,17 @@ class GHEmailFinder:
             )
             if not data:
                 break
-            
+
+            page_size = len(data)
+
+            if self.skip_forks:
+                data = [r for r in data if not r.get("fork")]
+
             repos.extend(data)
-            
-            if len(data) < 100:
+
+            if page_size < 100:
                 break
-                            
+
             page += 1
         return repos
 
@@ -178,9 +188,15 @@ class GHEmailFinder:
 
     def run(self):
         "Main execution flow and concurrent job management"
-        print(f"[*] Enumerating repositories for target: {self.username}")
+        if self.repo:
+            print(f"[*] Targeting single repository: {self.username}/{self.repo}")
+        else:
+            print(f"[*] Enumerating repositories for target: {self.username}")
+            if self.skip_forks:
+                print("[!] Skipping forks to save API quota.")
+
         repos = self.get_repos()
-        
+
         if not repos:
             print("[-] No accessible repositories found.")
             return
@@ -218,9 +234,11 @@ def main():
     parser.add_argument("-w", "--workers", default=10, type=int, help="Number of threads")
     parser.add_argument("--full", action="store_true", help="Scan all branches and tags")
     parser.add_argument("--deep", action="store_true", help="Perform deep scraping on .patch files")
+    parser.add_argument("-r", "--repo", help="Limit the scan to a single repository (skips listing/scanning the rest)")
+    parser.add_argument("--skip-forks", action="store_true", help="Skip forks when scanning all repos (forks share history with the original and rarely add new commits/emails)")
 
     args = parser.parse_args()
-    tool = GHEmailFinder(args.username, args.token, args.workers, args.full, args.deep)
+    tool = GHEmailFinder(args.username, args.token, args.workers, args.full, args.deep, args.repo, args.skip_forks)
 
     try:
         tool.run()
